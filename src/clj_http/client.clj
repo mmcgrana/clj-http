@@ -66,11 +66,9 @@
 
 (defn- chunk-seq
   "lazy sequence of input-streams for each of the chunks encoded in the
-   chunk input-stream. Assumes input-stream is using chunked http transport.
-   when-done should be called after elements are consumed, otherwise
-   the http connection is not closed!"
-  [^java.io.InputStream is when-done]
-  (let [when-done #(do (when-done) (.close is))
+   chunk input-stream. Assumes input-stream is using chunked http transport."
+  [^java.io.InputStream is]
+  (let [when-done #(do (.close is))
 	r (-> is java.io.InputStreamReader. java.io.BufferedReader.)]
     (take-while identity
       (repeatedly
@@ -86,26 +84,24 @@
 
 (defn wrap-output-coercion [client]
   (fn [{:keys [as,chunked?] :as req
-	:or {as :string chunked? false}}]
+        :or {as :string chunked? false}}]
     (let [resp (client req)
-	  {:keys [headers,body,when-done] :or {when-done (constantly nil)}} resp	   
-	  as-fn (fn [^java.io.InputStream is]
-		  (case as 
-		       :byte-array (IOUtils/toByteArray is)
-		       :string (String. (IOUtils/toByteArray is) "UTF-8")))]
+          {:keys [headers,body]} resp	   
+          as-fn (fn [^java.io.InputStream is]
+                  (case as 
+                        :byte-array (IOUtils/toByteArray is)
+                        :string (String. (IOUtils/toByteArray is) "UTF-8")))]
       (when chunked?
-	(assert (= (clojure.core/get headers "transfer-encoding") "chunked")))
+        (assert (= (clojure.core/get headers "transfer-encoding") "chunked")))
       (-> resp 
-       (update-in  [:body]
-	 (fn [is]
-	   (if (not (instance? java.io.InputStream is))
-	     is
-	     (if chunked?
-	      (map as-fn (chunk-seq is when-done))
-	      (let [r (as-fn is)]
-		(when-done)
-		r)))))
-       (dissoc :when-done)))))
+          (update-in [:body]
+                     (fn [is]
+                       (if (not (instance? java.io.InputStream is))
+                         is
+                         (if chunked?
+                           (map as-fn (chunk-seq is))
+                           (let [r (as-fn is)]
+                             r)))))))))
 
 
 (defn wrap-input-coercion [client]
@@ -186,23 +182,28 @@
       (client (-> req (dissoc :url) (merge (parse-url url))))
       (client req))))
 
+(defn wrap-client [client http-client]
+  (fn [req]
+    (client http-client req)))
+
 (defn wrap-request
   "Returns a battaries-included HTTP request function coresponding to the given
    core client. See client/client."
   [request]
   (-> request
-    wrap-redirects
-    wrap-exceptions
-    wrap-decompression
-    wrap-input-coercion
-    wrap-output-coercion
-    wrap-query-params
-    wrap-basic-auth
-    wrap-accept
-    wrap-accept-encoding
-    wrap-content-type
-    wrap-method
-    wrap-url))
+      (wrap-client (core/pooled-http-client))
+      wrap-redirects
+      wrap-exceptions
+      wrap-decompression
+      wrap-input-coercion
+      wrap-output-coercion
+      wrap-query-params
+      wrap-basic-auth
+      wrap-accept
+      wrap-accept-encoding
+      wrap-content-type
+      wrap-method
+      wrap-url))
 
 (def #^{:doc
   "Executes the HTTP request corresponding to the given map and returns the
