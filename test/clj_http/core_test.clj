@@ -3,7 +3,9 @@
   (:require [clojure.contrib.pprint :as pp])
   (:require [clojure.contrib.io :as io])
   (:require [clj-http.core :as core])
-  (:require [clj-http.util :as util]))
+  (:require [clj-http.util :as util])
+  (:import (org.apache.http.client.params CookiePolicy ClientPNames)
+           (org.apache.http.impl.client DefaultHttpClient)))
 
 (defn handler [req]
   (pp/pprint req)
@@ -32,6 +34,13 @@
 
 (defn slurp-body [req]
   (io/slurp* (:body req)))
+
+(deftest basic-http-client-test
+  (let [c (core/basic-http-client)]
+    (is (= (doto (.getParams (DefaultHttpClient.))
+             (.setParameter ClientPNames/COOKIE_POLICY
+                            CookiePolicy/BROWSER_COMPATIBILITY)))
+        (.getParams (core/basic-http-client)))))
 
 (deftest makes-get-request
   (let [resp (request {:request-method :get :uri "/get"})]
