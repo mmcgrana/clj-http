@@ -28,7 +28,9 @@
       (if (or (not (clojure.core/get req :throw-exceptions true))
               (unexceptional-status? status))
         resp
-        (throw (Exception. (str status)))))))
+        (throw (Exception.
+		(format "Error status: %d. More details\n%s" status
+			(String. (IOUtils/toByteArray  (:body resp))))))))))
 
 
 (defn follow-redirect [client req resp]
