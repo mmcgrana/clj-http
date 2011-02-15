@@ -64,7 +64,7 @@
 
 
 (deftest throw-on-exceptional
-  (let [client (fn [req] {:status 500})
+  (let [client (fn [req] {:status 500 :body "No worky."})
         e-client (client/wrap-exceptions client)]
     (is (thrown-with-msg? Exception #"500"
       (e-client {})))))

@@ -30,7 +30,7 @@
         resp
         (throw (Exception.
 		(format "Error status: %d. More details\n%s" status
-			(String. (IOUtils/toByteArray  (:body resp))))))))))
+			(String. (IOUtils/toByteArray (:body resp))))))))))
 
 
 (defn follow-redirect [client req resp]
