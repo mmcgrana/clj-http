@@ -83,25 +83,25 @@
 
 
 (defn compress-handler [req]
-  (case (get-in req [:headers "Accept-Encoding"])
+  (case (get-in req [:headers "accept-encoding"])
      "gzip"
        {:body (util/gzip (util/utf8-bytes "foofoofoo"))
-	:headers {"Content-Encoding" "gzip"}}
+	:headers {"content-encoding" "gzip"}}
      "gzip, deflate"
        {:body (util/gzip (util/utf8-bytes "foofoofoo"))
-	:headers {"Content-Encoding" "gzip"}}
+	:headers {"content-encoding" "gzip"}}
      "deflate"
        {:body (util/deflate (util/utf8-bytes "barbarbar"))
-	:headers {"Content-Encoding" "deflate"}}
+	:headers {"content-encoding" "deflate"}}
      {:body "foo"}))
 
 (deftest compress-test
   (let [client (client/wrap-decompression compress-handler)]
-    (is (= "foofoofoo" (-> {:headers {"Accept-Encoding" "gzip"}}
+    (is (= "foofoofoo" (-> {:headers {"accept-encoding" "gzip"}}
 			   client
 			   :body
 			   util/utf8-string)))
-    (is (= "barbarbar" (-> {:headers {"Accept-Encoding" "deflate"}}
+    (is (= "barbarbar" (-> {:headers {"accept-encoding" "deflate"}}
 			   client
 			   :body
 			   util/utf8-string)))
@@ -109,23 +109,23 @@
 
 (deftest coerce-compression
   (let [client (client/wrap-coerce-compression compress-handler)]
-    (is (= "gzip" (-> {:headers {"Accept-Encoding" "gzip"}}
+    (is (= "gzip" (-> {:headers {"accept-encoding" "gzip"}}
 		      client
-		      (get-in [:headers "Content-Encoding"]))))
-    (is (= "deflate" (-> {:headers {"Accept-Encoding" "deflate"}}
+		      (get-in [:headers "content-encoding"]))))
+    (is (= "deflate" (-> {:headers {"accept-encoding" "deflate"}}
 			 client
-			 (get-in [:headers "Content-Encoding"]))))
+			 (get-in [:headers "content-encoding"]))))
     (is (= "gzip" (-> {}
 		      client
-		      (get-in [:headers "Content-Encoding"]))))
-    (is (nil? (-> {:headers {"Accept-Encoding" "identity"}}
+		      (get-in [:headers "content-encoding"]))))
+    (is (nil? (-> {:headers {"accept-encoding" "identity"}}
 		  client
-		  (get-in [:headers "Content-Encoding"]))))))
+		  (get-in [:headers "content-encoding"]))))))
 
 (deftest apply-on-accept
   (is-applied client/wrap-accept
     {:accept :json}
-    {:headers {"Accept" "application/json"}}))
+    {:headers {"accept" "application/json"}}))
 
 (deftest pass-on-no-accept
   (is-passed client/wrap-accept
@@ -135,7 +135,7 @@
 (deftest apply-on-accept-encoding
   (is-applied client/wrap-accept-encoding
     {:accept-encoding [:identity :gzip]}
-    {:headers {"Accept-Encoding" "identity, gzip"}}))
+    {:headers {"accept-encoding" "identity, gzip"}}))
 
 (deftest pass-on-no-accept-encoding
   (is-passed client/wrap-accept-encoding
@@ -193,7 +193,7 @@
 (deftest apply-on-basic-auth
   (is-applied client/wrap-basic-auth
     {:basic-auth ["Aladdin" "open sesame"]}
-    {:headers {"Authorization" "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="}}))
+    {:headers {"authorization" "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="}}))
 
 (deftest pass-on-no-basic-auth
   (is-passed client/wrap-basic-auth

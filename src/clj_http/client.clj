@@ -53,7 +53,7 @@
 (defn wrap-decompression [client]
   (fn [req]
     (let [resp (client req)]
-      (case (get-in resp [:headers "Content-Encoding"])
+      (case (get-in resp [:headers "content-encoding"])
          "gzip"
            (update resp :body util/gunzip)
          "deflate"
@@ -62,9 +62,9 @@
 
 (defn wrap-coerce-compression [client]
   (fn [req]
-    (client (if (get-in req [:headers "Accept-Encoding"])
+    (client (if (get-in req [:headers "accept-encoding"])
 	      req
-	      (update req :headers assoc "Accept-Encoding" "gzip, deflate")))))
+	      (update req :headers assoc "accept-encoding" "gzip, deflate")))))
 
 
 (defn wrap-output-coercion [client]
@@ -102,7 +102,7 @@
   (fn [{:keys [accept] :as req}]
     (if accept
       (client (-> req (dissoc :accept)
-                      (assoc-in [:headers "Accept"]
+                      (assoc-in [:headers "accept"]
                         (content-type-value accept))))
       (client req))))
 
@@ -114,7 +114,7 @@
   (fn [{:keys [accept-encoding] :as req}]
     (if accept-encoding
       (client (-> req (dissoc :accept-encoding)
-                      (assoc-in [:headers "Accept-Encoding"]
+                      (assoc-in [:headers "accept-encoding"]
                         (accept-encoding-value accept-encoding))))
       (client req))))
 
@@ -142,7 +142,7 @@
   (fn [req]
     (if-let [[user password] (:basic-auth req)]
       (client (-> req (dissoc :basic-auth)
-                      (assoc-in [:headers "Authorization"]
+                      (assoc-in [:headers "authorization"]
                         (basic-auth-value user password))))
       (client req))))
 

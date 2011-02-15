@@ -17,10 +17,12 @@
       {:status 200 :body (:content-type req)}
     [:get "/header"]
       {:status 200 :body (get-in req [:headers "x-my-header"])}
+    [:get "/response-header"]
+      {:status 200 :body "check header" :headers {"X-My-Header" "header-val"}}
     [:post "/post"]
       {:status 200 :body (slurp (:body req))}
     [:get "/redirect"]
-      {:status 301 :body "redirecting" :headers {"location" "/get"}}
+      {:status 301 :body "redirecting" :headers {"Location" "/get"}}
     [:get "/error"]
       {:status 500 :body "o noes"}))
 
@@ -69,6 +71,11 @@
   (let [resp (request {:request-method :get :uri "/header"
                        :headers {"X-My-Header" "header-val"}})]
     (is (= "header-val" (slurp-body resp)))))
+
+(deftest ^{:integration true} returns-lowercase-headers
+  (run-server)
+  (let [resp (request {:request-method :get :uri "/response-header"})]
+    (is (= "header-val" (get-in resp [:headers "x-my-header"])))))
 
 (deftest ^{:integration true} sends-and-returns-byte-array-body
   (run-server)
