@@ -19,6 +19,8 @@
       {:status 200 :body (get-in req [:headers "x-my-header"])}
     [:post "/post"]
       {:status 200 :body (slurp (:body req))}
+    [:get "/redirect"]
+      {:status 301 :body "redirecting" :headers {"location" "/get"}}
     [:get "/error"]
       {:status 500 :body "o noes"}))
 
@@ -79,6 +81,11 @@
   (run-server)
   (let [resp (request {:request-method :get :uri "/get"})]
     (is (string? (get-in resp [:headers "date"])))))
+
+(deftest ^{:integration true} returns-redirect-status
+  (run-server)
+  (let [resp (request {:request-method :get :uri "/redirect"})]
+    (is (= 301 (:status resp)))))
 
 (deftest ^{:integration true} returns-status-on-exceptional-responses
   (run-server)
