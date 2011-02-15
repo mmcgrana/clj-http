@@ -82,25 +82,45 @@
     (is (= 500 (:status resp)))))
 
 
-(deftest apply-on-compressed
-  (let [client (fn [req] {:body (util/gzip (util/utf8-bytes "foofoofoo"))
-                          :headers {"Content-Encoding" "gzip"}})
-        c-client (client/wrap-decompression client)
-        resp (c-client {})]
-    (is (= "foofoofoo" (util/utf8-string (:body resp))))))
+(defn compress-handler [req]
+  (case (get-in req [:headers "Accept-Encoding"])
+     "gzip"
+       {:body (util/gzip (util/utf8-bytes "foofoofoo"))
+	:headers {"Content-Encoding" "gzip"}}
+     "gzip, deflate"
+       {:body (util/gzip (util/utf8-bytes "foofoofoo"))
+	:headers {"Content-Encoding" "gzip"}}
+     "deflate"
+       {:body (util/deflate (util/utf8-bytes "barbarbar"))
+	:headers {"Content-Encoding" "deflate"}}
+     {:body "foo"}))
 
-(deftest apply-on-deflated
-  (let [client (fn [req] {:body (util/deflate (util/utf8-bytes "barbarbar"))
-                          :headers {"Content-Encoding" "deflate"}})
-        c-client (client/wrap-decompression client)
-        resp (c-client {})]
-    (is (= "barbarbar" (util/utf8-string (:body resp))))))
+(deftest compress-test
+  (let [client (client/wrap-decompression compress-handler)]
+    (is (= "foofoofoo" (-> {:headers {"Accept-Encoding" "gzip"}}
+			   client
+			   :body
+			   util/utf8-string)))
+    (is (= "barbarbar" (-> {:headers {"Accept-Encoding" "deflate"}}
+			   client
+			   :body
+			   util/utf8-string)))
+    (is (= "foo" (-> {} client :body)))))
 
-(deftest pass-on-non-compressed
-  (let [c-client (client/wrap-decompression (fn [req] {:body "foo"}))
-        resp (c-client {:uri "/foo"})]
-    (is (= "foo" (:body resp)))))
-
+(deftest coerce-compression
+  (let [client (client/wrap-coerce-compression compress-handler)]
+    (is (= "gzip" (-> {:headers {"Accept-Encoding" "gzip"}}
+		      client
+		      (get-in [:headers "Content-Encoding"]))))
+    (is (= "deflate" (-> {:headers {"Accept-Encoding" "deflate"}}
+			 client
+			 (get-in [:headers "Content-Encoding"]))))
+    (is (= "gzip" (-> {}
+		      client
+		      (get-in [:headers "Content-Encoding"]))))
+    (is (nil? (-> {:headers {"Accept-Encoding" "identity"}}
+		  client
+		  (get-in [:headers "Content-Encoding"]))))))
 
 (deftest apply-on-accept
   (is-applied client/wrap-accept
