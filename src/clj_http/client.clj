@@ -88,13 +88,13 @@
   (fn [{:keys [as,chunked?] :as req
         :or {as :string chunked? false}}]
     (let [resp (client req)
-          {:keys [headers,body]} resp	   
+          {:keys [headers,body]} resp
+	  chunked? (and chunked?
+			(= (clojure.core/get headers "transfer-encoding") "chunked"))
           as-fn (fn [^java.io.InputStream is]
                   (case as 
                         :byte-array (IOUtils/toByteArray is)
                         :string (String. (IOUtils/toByteArray is) "UTF-8")))]
-      (when chunked?
-        (assert (= (clojure.core/get headers "transfer-encoding") "chunked")))
       (-> resp 
           (update-in [:body]
                      (fn [is]
