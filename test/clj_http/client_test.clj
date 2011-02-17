@@ -83,25 +83,32 @@
 
 
 (defn compress-handler [req]
-  (case (get-in req [:headers "accept-encoding"])
-     "gzip"
+  (case [(:uri req) (get-in req [:headers "accept-encoding"])]
+     ["/" "gzip"]
        {:body (util/gzip (util/utf8-bytes "foofoofoo"))
 	:headers {"content-encoding" "gzip"}}
-     "gzip, deflate"
+     ["/" "gzip, deflate"]
        {:body (util/gzip (util/utf8-bytes "foofoofoo"))
 	:headers {"content-encoding" "gzip"}}
-     "deflate"
+     ["/" "deflate"]
        {:body (util/deflate (util/utf8-bytes "barbarbar"))
+	:headers {"content-encoding" "deflate"}}
+     ["/rfc1951" "deflate"]
+       {:body (util/deflate (util/utf8-bytes "bazbazbaz") true)
 	:headers {"content-encoding" "deflate"}}
      {:body "foo"}))
 
 (deftest compress-test
   (let [client (client/wrap-decompression compress-handler)]
-    (is (= "foofoofoo" (-> {:headers {"accept-encoding" "gzip"}}
+    (is (= "foofoofoo" (-> {:uri "/", :headers {"accept-encoding" "gzip"}}
 			   client
 			   :body
 			   util/utf8-string)))
-    (is (= "barbarbar" (-> {:headers {"accept-encoding" "deflate"}}
+    (is (= "barbarbar" (-> {:uri "/", :headers {"accept-encoding" "deflate"}}
+			   client
+			   :body
+			   util/utf8-string)))
+    (is (= "bazbazbaz" (-> {:uri "/rfc1951", :headers {"accept-encoding" "deflate"}}
 			   client
 			   :body
 			   util/utf8-string)))
@@ -109,16 +116,16 @@
 
 (deftest coerce-compression
   (let [client (client/wrap-coerce-compression compress-handler)]
-    (is (= "gzip" (-> {:headers {"accept-encoding" "gzip"}}
+    (is (= "gzip" (-> {:uri "/", :headers {"accept-encoding" "gzip"}}
 		      client
 		      (get-in [:headers "content-encoding"]))))
-    (is (= "deflate" (-> {:headers {"accept-encoding" "deflate"}}
+    (is (= "deflate" (-> {:uri "/", :headers {"accept-encoding" "deflate"}}
 			 client
 			 (get-in [:headers "content-encoding"]))))
-    (is (= "gzip" (-> {}
+    (is (= "gzip" (-> {:uri "/"}
 		      client
 		      (get-in [:headers "content-encoding"]))))
-    (is (nil? (-> {:headers {"accept-encoding" "identity"}}
+    (is (nil? (-> {:uri "/", :headers {"accept-encoding" "identity"}}
 		  client
 		  (get-in [:headers "content-encoding"]))))))
 
