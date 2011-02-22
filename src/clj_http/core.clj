@@ -22,7 +22,7 @@
   ([] (pooled-http-client {:ttl 120
                            :max-total-conns 200
                            :max-per-route 10
-                           :max-redirects 5
+                           :max-redirects 8
                            :allow-circular-redirects true}))
   ([{:keys [ttl max-total-conns max-per-route
             max-redirects allow-circular-redirects]}]
