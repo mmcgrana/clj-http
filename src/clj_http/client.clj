@@ -4,7 +4,7 @@
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
   (:import (java.net URL)
-	   (org.apache.commons.io IOUtils))
+           (org.apache.commons.io IOUtils))
   (:refer-clojure :exclude (get)))
 
 (defn if-pos [v]
@@ -193,7 +193,7 @@
    core client. See client/client."
   [request]
   (-> request
-      (wrap-client (core/pooled-http-client))
+      (wrap-client (core/basic-http-client))
       wrap-redirects
       wrap-exceptions
       wrap-decompression
