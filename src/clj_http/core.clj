@@ -21,8 +21,11 @@
 (defn pooled-http-client
   ([] (pooled-http-client {:ttl 120
                            :max-total-conns 200
-                           :max-per-route 10}))
-  ([{:keys [ttl max-total-conns max-per-route]}]
+                           :max-per-route 10
+                           :max-redirects 8
+                           :allow-circular-redirects true}))
+  ([{:keys [ttl max-total-conns max-per-route
+            max-redirects allow-circular-redirects]}]
      (let [psf (PlainSocketFactory/getSocketFactory)
            ssf (SSLSocketFactory/getSocketFactory)
            schemes (doto (SchemeRegistry.)
@@ -30,8 +33,13 @@
                      (.register (Scheme. "https" ssf 443)))
            mgr (doto (ThreadSafeClientConnManager. schemes (long ttl) TimeUnit/SECONDS)
                  (.setMaxTotal max-total-conns)
-                 (.setDefaultMaxPerRoute max-per-route))]
-       (DefaultHttpClient. mgr))))
+                 (.setDefaultMaxPerRoute max-per-route))
+           http-client (DefaultHttpClient. mgr)]
+       (doto (.getParams http-client)
+         (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY)
+         (.setParameter ClientPNames/MAX_REDIRECTS max-redirects)
+         (.setParameter ClientPNames/ALLOW_CIRCULAR_REDIRECTS allow-circular-redirects))
+       http-client)))
 
 (defn basic-http-client
   []

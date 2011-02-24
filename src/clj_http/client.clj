@@ -4,7 +4,7 @@
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
   (:import (java.net URL)
-	   (org.apache.commons.io IOUtils))
+           (org.apache.commons.io IOUtils))
   (:refer-clojure :exclude (get)))
 
 (defn if-pos [v]
@@ -30,7 +30,7 @@
         resp
         (throw (Exception.
 		(format "Error status: %d. More details\n%s" status
-			(String. (IOUtils/toByteArray  (:body resp))))))))))
+			(String. (IOUtils/toByteArray (:body resp))))))))))
 
 
 (defn follow-redirect [client req resp]
