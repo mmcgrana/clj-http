@@ -187,7 +187,7 @@
 (defn wrap-client
   ([client http-client]
      (fn [req]
-       (client (if http-client http-client (basic-http-client)) req)))
+       (client (if http-client http-client (core/basic-http-client)) req)))
   ([client] (wrap-client client nil)))
 
 (defn wrap-request
