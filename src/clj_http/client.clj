@@ -184,16 +184,18 @@
       (client (-> req (dissoc :url) (merge (parse-url url))))
       (client req))))
 
-(defn wrap-client [client http-client]
-  (fn [req]
-    (client http-client req)))
+(defn wrap-client
+  ([client http-client]
+     (fn [req]
+       (client (if http-client http-client (basic-http-client)) req)))
+  ([client] (wrap-client client nil)))
 
 (defn wrap-request
   "Returns a battaries-included HTTP request function coresponding to the given
    core client. See client/client."
   [request]
   (-> request
-      (wrap-client (core/pooled-http-client))
+      wrap-client
       wrap-redirects
       wrap-exceptions
       wrap-decompression
