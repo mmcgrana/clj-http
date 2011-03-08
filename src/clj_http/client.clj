@@ -41,10 +41,10 @@
   (fn [{:keys [request-method] :as req}]
     (let [{:keys [status] :as resp} (client req)]
       (cond
-        (and (#{301 302 307} status) (#{:get :head} request-method))
-          (follow-redirect client req resp)
-        (and (= 303 status) (= :head request-method))
-          (follow-redirect client (assoc req :request-method :get) resp)
+       (and (#{301 302 307} status) (#{:get :head} request-method))
+         (follow-redirect (wrap-redirects client) req resp)
+       (and (= 303 status) (= :head request-method))
+         (follow-redirect (wrap-redirects client) (assoc req :request-method :get) resp)
         :else
           resp))))
 

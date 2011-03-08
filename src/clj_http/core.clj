@@ -2,6 +2,7 @@
   "Core HTTP request/response implementation."
   (:import (org.apache.http HttpRequest HttpEntityEnclosingRequest HttpResponse Header))
   (:import (org.apache.http.util EntityUtils))
+  (:import (org.apache.http.client HttpClient))
   (:import (org.apache.http.entity ByteArrayEntity))
   (:import (org.apache.http.client.methods HttpGet HttpHead HttpPut HttpPost HttpDelete))
   (:import (org.apache.http.client.params CookiePolicy ClientPNames))
@@ -12,7 +13,8 @@
                                         SchemeRegistry SocketFactory))
   (:import (org.apache.http.conn.ssl SSLSocketFactory))
   (:import (org.apache.http.impl.conn.tsccm ThreadSafeClientConnManager))
-  (:import (java.util.concurrent TimeUnit)))
+  (:import (java.util.concurrent TimeUnit))
+  (:import (java.io InputStream)))
 
 (defn- parse-headers [^HttpResponse http-resp]
   (into {} (map (fn [^Header h] [(.toLowerCase (.getName h)) (.getValue h)])
@@ -21,11 +23,8 @@
 (defn pooled-http-client
   ([] (pooled-http-client {:ttl 120
                            :max-total-conns 200
-                           :max-per-route 10
-                           :max-redirects 8
-                           :allow-circular-redirects true}))
-  ([{:keys [ttl max-total-conns max-per-route
-            max-redirects allow-circular-redirects]}]
+                           :max-per-route 10}))
+  ([{:keys [ttl max-total-conns max-per-route]}]
      (let [psf (PlainSocketFactory/getSocketFactory)
            ssf (SSLSocketFactory/getSocketFactory)
            schemes (doto (SchemeRegistry.)
@@ -37,24 +36,24 @@
            http-client (DefaultHttpClient. mgr)]
        (doto (.getParams http-client)
          (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY)
-         (.setParameter ClientPNames/MAX_REDIRECTS max-redirects)
-         (.setParameter ClientPNames/ALLOW_CIRCULAR_REDIRECTS allow-circular-redirects))
+         (.setParameter ClientPNames/HANDLE_REDIRECTS false))
        http-client)))
 
 (defn basic-http-client
   []
-  (let [http-client (DefaultHttpClient.)]
+  (let [http-client (DefaultHttpClient.)
+        params (.getParams http-client)]
     (try
-      (-> http-client
-        (.getParams)
-        (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY)))
+      (doto (.getParams http-client)
+        (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY)
+        (.setParameter ClientPNames/HANDLE_REDIRECTS false)))
     http-client))
 
 (defn request
   "Executes the HTTP request corresponding to the given Ring request map and
    returns the Ring response map corresponding to the resulting HTTP response."
-  ([http-client {:keys [request-method scheme server-name server-port uri query-string
-                        headers content-type character-encoding body]}]
+  ([^HttpClient http-client {:keys [request-method scheme server-name server-port uri query-string
+                                    headers content-type character-encoding body]}]
      (try
        (let [http-url (str scheme "://" server-name
                            (if server-port (str ":" server-port))

@@ -1,8 +1,8 @@
 (ns clj-http.client-test
   (:use clojure.test) 
   (:require [clj-http.client :as client]
-	    [clj-http.util :as util]
-	    [clojure.contrib.io  :as io])
+            [clj-http.util :as util]
+            [clojure.contrib.io  :as io])
   (:import (java.util Arrays)))
 
 
@@ -27,19 +27,43 @@
     (is (= req-out (client req-in)))))
 
 
+(deftest parse-url-test
+  (let [u (client/parse-url "http://bar.com/bat#cat")]
+    (is (= "http"
+           (:scheme u)))
+    ;; Note that anchors are ignored
+    (is (= "/bat"
+           (:uri u))))
+
+  (let [u (client/parse-url "http://foo.com/blargh?args=true")]
+    (is (= "http"
+           (:scheme u)))
+    (is (= "/blargh"
+           (:uri u)))
+    (is (= "args=true"
+           (:query-string u)))))
+
 (deftest redirect-on-get
   (let [client (fn [req]
-                 (if (= "foo.com" (:server-name req))
-                   {:status 302
-                    :headers {"location" "http://bar.com/bat"}}
-                   {:status 200
-                    :req req}))
+                 (cond
+                  (= "foo.com" (:server-name req))
+                  {:status 301
+                   :headers {"location" "http://deal.com"}}
+
+                  (= "deal.com" (:server-name req))
+                  {:status 302
+                   :headers {"location" "http://bar.com/bat?more=yes&x=3"}}
+
+                  (= "bar.com" (:server-name req))
+                  {:status 200
+                   :req req}))
         r-client (client/wrap-redirects client)
         resp (r-client {:server-name "foo.com" :request-method :get})]
     (is (= 200 (:status resp)))
     (is (= :get (:request-method (:req resp))))
     (is (= "http" (:scheme (:req resp))))
-    (is (= "/bat" (:uri (:req resp))))))
+    (is (= "/bat" (:uri (:req resp))))
+    (is (= "more=yes&x=3" (:query-string (:req resp))))))
 
 (deftest redirect-to-get-on-head
   (let [client (fn [req]
