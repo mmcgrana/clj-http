@@ -33,9 +33,28 @@
 			(String. (IOUtils/toByteArray (:body resp))))))))))
 
 
+(defn ensure-proper-url
+  [loc default-protocol default-host]
+  (cond (.startsWith loc "/")
+        (format "%s://%s%s" default-protocol default-host loc)
+
+        (not (.startsWith loc "http"))
+        (format "%s://%s" default-protocol loc)
+
+        :default
+        loc))
+
 (defn follow-redirect [client req resp]
-  (let [url (get-in resp [:headers "location"])]
-    (client (merge req (parse-url url)))))
+  (assert (and (:scheme req)
+               (:server-name req)))
+  (let [url (ensure-proper-url
+             (get-in resp [:headers "location"])
+             (:scheme req)
+             (:server-name req))
+        url-parts (parse-url url)]
+    (client (merge req
+                   url-parts
+                   (select-keys req [:server-port])))))
 
 (defn wrap-redirects [client]
   (fn [{:keys [request-method] :as req}]

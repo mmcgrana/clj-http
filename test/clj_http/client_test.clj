@@ -28,20 +28,51 @@
 
 
 (deftest parse-url-test
-  (let [u (client/parse-url "http://bar.com/bat#cat")]
-    (is (= "http"
-           (:scheme u)))
-    ;; Note that anchors are ignored
-    (is (= "/bat"
-           (:uri u))))
+  (is (= {:scheme "http"
+          :server-name "bar.com"
+          :server-port nil
+          :uri "/bat"
+          :query-string nil}
+         (client/parse-url "http://bar.com/bat#cat")))
+  
+  (is (= {:scheme "http"
+          :server-name "foo.com"
+          :server-port nil
+          :uri "/blargh"
+          :query-string "args=true"}
+         (client/parse-url "http://foo.com/blargh?args=true")))
+  
+  (is (= {:scheme "http"
+          :server-name "mud.com"
+          :server-port 8080
+          :uri "/gnarl"
+          :query-string "boom=true"}
+         (client/parse-url "http://mud.com:8080/gnarl?boom=true"))))
 
-  (let [u (client/parse-url "http://foo.com/blargh?args=true")]
+(deftest ensure-proper-url-test
+  (is (= "http://host.com/path"
+         (client/ensure-proper-url "/path" "http" "host.com")))
+  (is (= "https://foo.com/path"
+         (client/ensure-proper-url "foo.com/path" "https" "bar.com"))))
+
+;; http://f.com:443/orig -- /target -> http://f.com:443/doh
+;; http://g.com/old -- /new -> http://g.com/new
+;; http://h.com:8080/old -- http://hh.com/new -> http://hh.com/new
+(deftest follow-redirect-test
+  (let [client identity
+        req (client/parse-url "http://mud.com:8080/gnarl?boom=true")
+        resp {:headers {"location" "/rad?arg=foo"}}
+        red-req (client/follow-redirect client req resp)]
     (is (= "http"
-           (:scheme u)))
-    (is (= "/blargh"
-           (:uri u)))
-    (is (= "args=true"
-           (:query-string u)))))
+           (:scheme red-req)))
+    (is (= "mud.com"
+           (:server-name red-req)))
+    (is (= 8080
+           (:server-port red-req)))
+    (is (= "/rad"
+           (:uri red-req)))
+    (is (= "arg=foo"
+           (:query-string red-req)))))
 
 (deftest redirect-on-get
   (let [client (fn [req]
@@ -58,7 +89,17 @@
                   {:status 200
                    :req req}))
         r-client (client/wrap-redirects client)
-        resp (r-client {:server-name "foo.com" :request-method :get})]
+        resp (r-client {:scheme "http"
+                        :server-name "foo.com"
+                        :request-method :get})]
+    (is (= {:status 200
+            :req {:request-method :get
+                  :scheme "http"
+                  :server-name "bar.com"
+                  :server-port nil
+                  :uri "/bat"
+                  :query-string "more=yes&x=3"}}
+           resp))
     (is (= 200 (:status resp)))
     (is (= :get (:request-method (:req resp))))
     (is (= "http" (:scheme (:req resp))))
@@ -73,7 +114,9 @@
                    {:status 200
                     :req req}))
         r-client (client/wrap-redirects client)
-        resp (r-client {:server-name "foo.com" :request-method :head})]
+        resp (r-client {:scheme "http"
+                        :server-name "foo.com"
+                        :request-method :head})]
     (is (= 200 (:status resp)))
     (is (= :get (:request-method (:req resp))))
     (is (= "http" (:scheme (:req resp))))
