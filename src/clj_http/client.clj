@@ -20,7 +20,8 @@
 
 
 (def unexceptional-status?
-  #{200 201 202 203 204 205 206 207 300 301 302 303 307})
+  #{200 201 202 203 204 205 206 207
+    300 301 302 303 304 307})
 
 (defn wrap-exceptions [client]
   (fn [req]
