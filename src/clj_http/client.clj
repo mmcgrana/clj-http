@@ -210,11 +210,47 @@
        (client (if http-client http-client (core/basic-http-client)) req)))
   ([client] (wrap-client client nil)))
 
+(defn skip?
+  "Tests if the given clj-http middleware (wrap-fn) should be skipped
+   for the current request. It expects an entry :skip with a (predicate)
+   function as value inside the request map, which determines if the
+   actual clj-http middleware function should be skipped."
+  [client wrap-fn & more]
+  (let [f (apply wrap-fn (conj more client))]
+    (fn [req]
+      (let [s (:skip req)]
+        (if (and s (s wrap-fn))
+          (client req)
+          (f req))))))
+
+(defmacro wrap
+  "Wraps a bunch of clj-http middleware around a HTTP request function.
+
+   The use of wrap makes it possible that clj-http middleware functions can be skipped
+   on a per request basis. Example: If you are using the middleware wrap-redirects and
+   its behaviour is desired for the most of your use cases, but in some cases you
+   don't want to follow the redirect, then you can disable the middleware for only
+   a particular request:
+
+   (client/get \"http://bit.ly/3a0JDj\" {:skip #{clj-http.client/wrap-redirects}})
+
+   The value of :skip is expected to be a predicate function."
+
+  [request & forms]
+  `(-> ~request ~@(map
+                   (fn [form]
+                     (if (seq? form)
+                       (with-meta
+                         `((fn [client#]
+                             (skip? client# ~(first form) ~@(next form)))) (meta form))
+                       `((fn [client#] (skip? client# ~form)))))
+                   forms)))
+
 (defn wrap-request
   "Returns a battaries-included HTTP request function coresponding to the given
    core client. See client/client."
   [request]
-  (-> request
+  (wrap request
       wrap-client
       wrap-redirects
       wrap-exceptions
