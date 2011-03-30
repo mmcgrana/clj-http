@@ -1,6 +1,6 @@
 (ns clj-http.util
   "Helper functions for the HTTP client."
-  (:import (java.net URLEncoder))
+  (:import (java.net URLEncoder URLDecoder))
   (:import (org.apache.commons.codec.binary Base64))
   (:import (java.io ByteArrayInputStream ByteArrayOutputStream))
   (:import (java.util.zip InflaterInputStream DeflaterInputStream
@@ -16,6 +16,12 @@
   "Returns the String corresponding to the UTF-8 decoding of the given bytes."
   [#^"[B" b]
   (String. b "UTF-8"))
+
+(defn url-decode
+  "Returns the form-url-decoded version of the given string, using either a
+  specified encoding or UTF-8 by default."
+  [encoded & [encoding]]
+  (URLDecoder/decode encoded (or encoding "UTF-8")))
 
 (defn url-encode
   "Returns an UTF-8 URL encoded version of the given string."
