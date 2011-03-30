@@ -1,4 +1,4 @@
-(defproject nuggad/clj-http "0.1.3"
+(defproject org.clojars.nuggad/clj-http "0.1.3"
   :description
     "A Clojure HTTP library wrapping the Apache HttpComponents client."
   :dependencies
