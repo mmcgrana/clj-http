@@ -23,7 +23,8 @@
     (try
       (-> http-client
         (.getParams)
-        (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY))
+        (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY)
+        (.setParameter ClientPNames/HANDLE_REDIRECTS false))
       (let [http-url (str scheme "://" server-name
                           (if server-port (str ":" server-port))
                           uri
