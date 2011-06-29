@@ -13,10 +13,7 @@
 
 (defn request
   "Executes the HTTP request corresponding to the given Ring request map and
-   returns the Ring response map corresponding to the resulting HTTP response.
-
-   Note that where Ring uses InputStreams for the request and response bodies,
-   the clj-http uses ByteArrays for the bodies."
+   returns the Ring response map corresponding to the resulting HTTP response."
   [{:keys [request-method scheme server-name server-port uri query-string
            headers content-type character-encoding body]}]
   (let [http-client (DefaultHttpClient.)]
@@ -50,6 +47,6 @@
               http-entity (.getEntity http-resp)
               resp {:status (.getStatusCode (.getStatusLine http-resp))
                     :headers (parse-headers http-resp)
-                    :body (if http-entity (EntityUtils/toByteArray http-entity))}]
+                    :body (if http-entity (.getContent http-entity))}]
           (.shutdown (.getConnectionManager http-client))
           resp)))))

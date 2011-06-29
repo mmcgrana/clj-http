@@ -4,6 +4,7 @@
   (:require [clojure.string :as str])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
+  (:require [clojure.contrib.duck-streams :as duck-streams])
   (:refer-clojure :exclude (get)))
 
 (defn update [m k f & args]
@@ -69,10 +70,14 @@
   (fn [{:keys [as] :as req}]
     (let [{:keys [body] :as resp} (client req)]
       (cond
-        (or (nil? body) (= :byte-array as))
+        (or (nil? body) (= :stream as))
           resp
+        (= :byte-array as)
+          (assoc resp :body (duck-streams/to-byte-array body))
         (nil? as)
-          (assoc resp :body (String. #^"[B" body "UTF-8"))))))
+          (assoc resp :body (String.
+                              #^"[B" (duck-streams/to-byte-array body)
+                              "UTF-8"))))))
 
 
 (defn wrap-input-coercion [client]
