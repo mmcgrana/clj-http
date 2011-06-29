@@ -1,5 +1,6 @@
 (ns clj-http.core
   "Core HTTP request/response implementation."
+  (:import (java.io InputStream))
   (:import (org.apache.http HttpRequest HttpEntityEnclosingRequest HttpResponse Header))
   (:import (org.apache.http.util EntityUtils))
   (:import (org.apache.http.entity ByteArrayEntity))
@@ -10,6 +11,13 @@
 (defn- parse-headers [#^HttpResponse http-resp]
   (into {} (map (fn [#^Header h] [(.toLowerCase (.getName h)) (.getValue h)])
                 (iterator-seq (.headerIterator http-resp)))))
+
+(defn- proxy-inputstream [stream http-client]
+  (proxy [InputStream] []
+    (avaible
+    (read [] (.read stream))
+    (close [] (.close stream)
+              (.shutdown (.getConnectionManager http-client)))))
 
 (defn request
   "Executes the HTTP request corresponding to the given Ring request map and
@@ -47,6 +55,7 @@
               http-entity (.getEntity http-resp)
               resp {:status (.getStatusCode (.getStatusLine http-resp))
                     :headers (parse-headers http-resp)
-                    :body (if http-entity (.getContent http-entity))}]
-          (.shutdown (.getConnectionManager http-client))
+                    :body (if http-entity (proxy-inputstream
+                                           (.getContent http-entity)
+                                           http-client))}]
           resp)))))
