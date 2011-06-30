@@ -12,12 +12,27 @@
   (into {} (map (fn [#^Header h] [(.toLowerCase (.getName h)) (.getValue h)])
                 (iterator-seq (.headerIterator http-resp)))))
 
+; The ClientConnectionManager is shutdown whenever the stream is closed.
 (defn- proxy-inputstream [stream http-client]
   (proxy [InputStream] []
-    (avaible
-    (read [] (.read stream))
-    (close [] (.close stream)
-              (.shutdown (.getConnectionManager http-client)))))
+    (available []
+      (.available stream))
+    (close []
+      (.close stream)
+      (.shutdown (.getConnectionManager http-client)))
+    (mark [read-limit]
+      (.mark stream read-limit))
+    (markSupported []
+      (.markSupported stream))
+    (read
+      ([] (.read stream))
+      ([b] (.read stream b))
+      ([b off len] (.read stream b off len)))
+    (reset []
+      (.reset stream))
+    (skip [n]
+      (.skip stream n))))
+    
 
 (defn request
   "Executes the HTTP request corresponding to the given Ring request map and
