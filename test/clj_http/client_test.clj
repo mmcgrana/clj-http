@@ -1,9 +1,11 @@
 (ns clj-http.client-test
   (:use clojure.test)
   (:use [clj-http.core-test :only [run-server]] )
+  (:require [clojure.contrib.duck-streams :as duck-streams])
   (:require [clj-http.client :as client])
   (:require [clj-http.util :as util])
-  (:import (java.util Arrays)))
+  (:import (java.util Arrays)
+           (java.io ByteArrayInputStream)))
 
 (def base-req
   {:scheme "http"
@@ -123,21 +125,18 @@
 
 
 (deftest apply-on-output-coercion
-  (let [client (fn [req] {:body (util/utf8-bytes "foo")})
+  (let [client (fn [req]
+                 {:body (ByteArrayInputStream. (util/utf8-bytes "foo"))})
         o-client (client/wrap-output-coercion client)
         resp (o-client {:uri "/foo"})]
-    (is (= "foo" (:body resp)))))
+    (is (= "foo"
+           (String. (duck-streams/to-byte-array (:body resp)) "UTF-8")))))
 
 (deftest pass-on-no-output-coercion
   (let [client (fn [req] {:body nil})
         o-client (client/wrap-output-coercion client)
         resp (o-client {:uri "/foo"})]
-    (is (nil? (:body resp))))
-  (let [client (fn [req] {:body :thebytes})
-        o-client (client/wrap-output-coercion client)
-        resp (o-client {:uri "/foo" :as :byte-array})]
-    (is (= :thebytes (:body resp)))))
-
+    (is (nil? (:body resp)))))
 
 (deftest apply-on-input-coercion
   (let [i-client (client/wrap-input-coercion identity)

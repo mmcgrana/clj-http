@@ -70,15 +70,14 @@
   (fn [{:keys [as] :as req}]
     (let [{:keys [body] :as resp} (client req)]
       (cond
-       (or (nil? body) (= :stream as))
-         body
-       (= :byte-array as)
-         (duck-streams/to-byte-array body)
-       (nil? as)
-         (assoc resp :body (String.
-                             #^"[B" (duck-streams/to-byte-array body)
-                             "UTF-8"))))))
-
+        (or (nil? body) (= :stream as))
+          resp
+        (= :byte-array as)
+          (assoc resp :body (duck-streams/to-byte-array body))
+        (nil? as)
+          (assoc resp :body (String.
+                              #^"[B" (duck-streams/to-byte-array body)
+                              "UTF-8"))))))
 
 (defn wrap-input-coercion [client]
   (fn [{:keys [body] :as req}]
