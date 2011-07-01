@@ -90,7 +90,7 @@
      (string? body)
        (client (assoc req :body (ByteArrayInputStream. (.getBytes body "UTF-8"))
                           :character-encoding "UTF-8"))
-     (instance? InputStream body)
+     (or (nil? body) (instance? InputStream body))
        (client req)
      :else
        (client (assoc req :body (ByteArrayInputStream. body))))))
