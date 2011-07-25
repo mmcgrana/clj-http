@@ -32,7 +32,7 @@
       (if (or (not (clojure.core/get req :throw-exceptions true))
               (unexceptional-status? status))
         resp
-        (throw (Exception. (str status)))))))
+        (throw (Exception. (str "The resource " (:uri req) " returned status " status)))))))
 
 
 (defn follow-redirect [client req resp]
