@@ -125,7 +125,6 @@
                            (let [r (as-fn is)]
                              r)))))))))
 
-
 (defn wrap-input-coercion [client]
   (fn [{:keys [body] :as req}]
     (if (string? body)
@@ -177,6 +176,17 @@
       (client (-> req (dissoc :query-params)
                       (assoc :query-string
                              (generate-query-string query-params))))
+      (client req))))
+
+(defn wrap-form-params [client]
+  (fn [req]
+    (if-let [form-params (:form-params req)]
+      (let [body (generate-query-string form-params)
+            req (-> req
+                    (assoc-in [:headers "Content-Type"]
+                              "application/x-www-form-urlencoded")
+                    (assoc :body body))]
+        (client req))
       (client req))))
 
 (defn basic-auth-value [user password]
@@ -258,6 +268,7 @@
       wrap-input-coercion
       wrap-output-coercion
       wrap-query-params
+      wrap-form-params
       wrap-basic-auth
       wrap-accept
       wrap-accept-encoding
