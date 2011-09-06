@@ -1,6 +1,6 @@
 (ns clj-http.client
   "Batteries-included HTTP client."
-  (:require [clojure.contrib.string :as str])
+  (:require [clojure.string :as str])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
   (:import (java.net URL)
@@ -14,8 +14,10 @@
   (let [url-parsed (URL. url)]
     {:scheme (.getProtocol url-parsed)
      :server-name (.getHost url-parsed)
-     :server-port (if-pos (.getPort url-parsed))
+     :server-port (or (if-pos (.getPort url-parsed))
+		      (if (= "https" (.getProtocol url-parsed))	443 80))
      :uri (.getPath url-parsed)
+     :user-info (.getUserInfo url-parsed)
      :query-string (.getQuery url-parsed)}))
 
 
@@ -201,6 +203,16 @@
                         (basic-auth-value user password))))
       (client req))))
 
+(defn parse-user-info [user-info]
+  (when user-info
+    (str/split user-info #":")))
+
+(defn wrap-user-info [client]
+  (fn [req]
+    (if-let [[user password] (parse-user-info (:user-info req))]
+      (client (assoc req :basic-auth [user password]))
+      (client req))))
+
 (defn wrap-method [client]
   (fn [req]
     (if-let [m (:method req)]
@@ -270,6 +282,7 @@
       wrap-query-params
       wrap-form-params
       wrap-basic-auth
+      wrap-user-info
       wrap-accept
       wrap-accept-encoding
       wrap-content-type
