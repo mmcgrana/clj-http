@@ -226,12 +226,6 @@
       (client (-> req (dissoc :url) (merge (parse-url url))))
       (client req))))
 
-(defn wrap-client
-  ([client http-client]
-     (fn [req]
-       (client (if http-client http-client (core/basic-http-client)) req)))
-  ([client] (wrap-client client nil)))
-
 (defn skip?
   "Tests if the given clj-http middleware (wrap-fn) should be skipped
    for the current request. It expects an entry :skip with a (predicate)
@@ -273,7 +267,6 @@
    core client. See client/client."
   [request]
   (wrap request
-      wrap-client
       wrap-redirects
       wrap-exceptions
       wrap-decompression
