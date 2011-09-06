@@ -7,8 +7,5 @@
                  [commons-codec "1.4"]
                  [commons-io "1.4"]]
   :dev-dependencies [[ring/ring-jetty-adapter "0.3.5"]
-                     [ring/ring-devel "0.3.5"]
-                     [robert/hooke "1.1.0"]]
-  :test-selectors {:default  #(not (:integration %))
-                   :integration :integration
-                   :all (constantly true)})
+                     [ring/ring-devel "0.3.5"]])
+
