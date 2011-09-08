@@ -21,9 +21,9 @@
            headers content-type character-encoding body]}]
   (let [http-client (DefaultHttpClient.)]
     (try
-      (-> http-client
-        (.getParams)
-        (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY))
+      (doto (.getParams http-client)
+	(.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY)
+	(.setParameter "http.protocol.handle-redirects" false))
       (let [http-url (str scheme "://" server-name
                           (if server-port (str ":" server-port))
                           uri

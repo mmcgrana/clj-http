@@ -82,30 +82,57 @@
     (is (= 500 (:status resp)))))
 
 
-(deftest apply-on-compressed
-  (let [client (fn [req] {:body (util/gzip (util/utf8-bytes "foofoofoo"))
-                          :headers {"Content-Encoding" "gzip"}})
-        c-client (client/wrap-decompression client)
-        resp (c-client {})]
-    (is (= "foofoofoo" (util/utf8-string (:body resp))))))
+(defn compress-handler [req]
+  (case [(:uri req) (get-in req [:headers "accept-encoding"])]
+     ["/" "gzip"]
+       {:body (util/gzip (util/utf8-bytes "foofoofoo"))
+	:headers {"content-encoding" "gzip"}}
+     ["/" "gzip, deflate"]
+       {:body (util/gzip (util/utf8-bytes "foofoofoo"))
+	:headers {"content-encoding" "gzip"}}
+     ["/" "deflate"]
+       {:body (util/deflate (util/utf8-bytes "barbarbar"))
+	:headers {"content-encoding" "deflate"}}
+     ["/rfc1951" "deflate"]
+       {:body (util/deflate (util/utf8-bytes "bazbazbaz") true)
+	:headers {"content-encoding" "deflate"}}
+     {:body "foo"}))
 
-(deftest apply-on-deflated
-  (let [client (fn [req] {:body (util/deflate (util/utf8-bytes "barbarbar"))
-                          :headers {"Content-Encoding" "deflate"}})
-        c-client (client/wrap-decompression client)
-        resp (c-client {})]
-    (is (= "barbarbar" (util/utf8-string (:body resp))))))
+(deftest compress-test
+  (let [client (client/wrap-decompression compress-handler)]
+    (is (= "foofoofoo" (-> {:uri "/", :headers {"accept-encoding" "gzip"}}
+			   client
+			   :body
+			   util/utf8-string)))
+    (is (= "barbarbar" (-> {:uri "/", :headers {"accept-encoding" "deflate"}}
+			   client
+			   :body
+			   util/utf8-string)))
+    (is (= "bazbazbaz" (-> {:uri "/rfc1951", :headers {"accept-encoding" "deflate"}}
+			   client
+			   :body
+			   util/utf8-string)))
+    (is (= "foo" (-> {} client :body)))))
 
-(deftest pass-on-non-compressed
-  (let [c-client (client/wrap-decompression (fn [req] {:body "foo"}))
-        resp (c-client {:uri "/foo"})]
-    (is (= "foo" (:body resp)))))
-
+(deftest coerce-compression
+  (let [client (client/wrap-coerce-compression compress-handler)]
+    (is (= "gzip" (-> {:uri "/", :headers {"accept-encoding" "gzip"}}
+		      client
+		      (get-in [:headers "content-encoding"]))))
+    (is (= "deflate" (-> {:uri "/", :headers {"accept-encoding" "deflate"}}
+			 client
+			 (get-in [:headers "content-encoding"]))))
+    (is (= "gzip" (-> {:uri "/"}
+		      client
+		      (get-in [:headers "content-encoding"]))))
+    (is (nil? (-> {:uri "/", :headers {"accept-encoding" "identity"}}
+		  client
+		  (get-in [:headers "content-encoding"]))))))
 
 (deftest apply-on-accept
   (is-applied client/wrap-accept
     {:accept :json}
-    {:headers {"Accept" "application/json"}}))
+    {:headers {"accept" "application/json"}}))
 
 (deftest pass-on-no-accept
   (is-passed client/wrap-accept
@@ -115,7 +142,7 @@
 (deftest apply-on-accept-encoding
   (is-applied client/wrap-accept-encoding
     {:accept-encoding [:identity :gzip]}
-    {:headers {"Accept-Encoding" "identity, gzip"}}))
+    {:headers {"accept-encoding" "identity, gzip"}}))
 
 (deftest pass-on-no-accept-encoding
   (is-passed client/wrap-accept-encoding
@@ -173,7 +200,7 @@
 (deftest apply-on-basic-auth
   (is-applied client/wrap-basic-auth
     {:basic-auth ["Aladdin" "open sesame"]}
-    {:headers {"Authorization" "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="}}))
+    {:headers {"authorization" "Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=="}}))
 
 (deftest pass-on-no-basic-auth
   (is-passed client/wrap-basic-auth

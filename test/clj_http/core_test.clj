@@ -17,8 +17,12 @@
       {:status 200 :body (:content-type req)}
     [:get "/header"]
       {:status 200 :body (get-in req [:headers "x-my-header"])}
+    [:get "/response-header"]
+      {:status 200 :body "check header" :headers {"X-My-Header" "header-val"}}
     [:post "/post"]
       {:status 200 :body (slurp (:body req))}
+    [:get "/redirect"]
+      {:status 301 :body "redirecting" :headers {"Location" "/get"}}
     [:get "/error"]
       {:status 500 :body "o noes"}))
 
@@ -68,6 +72,11 @@
                        :headers {"X-My-Header" "header-val"}})]
     (is (= "header-val" (slurp-body resp)))))
 
+(deftest ^{:integration true} returns-lowercase-headers
+  (run-server)
+  (let [resp (request {:request-method :get :uri "/response-header"})]
+    (is (= "header-val" (get-in resp [:headers "x-my-header"])))))
+
 (deftest ^{:integration true} sends-and-returns-byte-array-body
   (run-server)
   (let [resp (request {:request-method :post :uri "/post"
@@ -79,6 +88,11 @@
   (run-server)
   (let [resp (request {:request-method :get :uri "/get"})]
     (is (string? (get-in resp [:headers "date"])))))
+
+(deftest ^{:integration true} returns-redirect-status
+  (run-server)
+  (let [resp (request {:request-method :get :uri "/redirect"})]
+    (is (= 301 (:status resp)))))
 
 (deftest ^{:integration true} returns-status-on-exceptional-responses
   (run-server)

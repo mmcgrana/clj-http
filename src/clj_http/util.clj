@@ -3,7 +3,7 @@
   (:import (java.net URLEncoder))
   (:import (org.apache.commons.codec.binary Base64))
   (:import (java.io ByteArrayInputStream ByteArrayOutputStream))
-  (:import (java.util.zip InflaterInputStream DeflaterInputStream
+  (:import (java.util.zip Inflater Deflater InflaterInputStream DeflaterInputStream
                           GZIPInputStream GZIPOutputStream))
   (:import (org.apache.commons.io IOUtils)))
 
@@ -42,11 +42,19 @@
     (.toByteArray baos)))
 
 (defn inflate
-  "Returns a zlib inflate'd version of the given byte array."
+  "Returns a zlib inflate'd version of the given byte array.
+   Try to use RFC1950 first, if failed then RFC1951 next."
   [b]
-  (IOUtils/toByteArray (InflaterInputStream. (ByteArrayInputStream. b))))
+  (try
+    (IOUtils/toByteArray (InflaterInputStream. (ByteArrayInputStream. b)))
+    (catch java.util.zip.ZipException e
+      (IOUtils/toByteArray (InflaterInputStream. (ByteArrayInputStream. b)
+						 (Inflater. true))))))
 
 (defn deflate
   "Returns a deflate'd version of the given byte array."
-  [b]
-  (IOUtils/toByteArray (DeflaterInputStream. (ByteArrayInputStream. b))))
+  ([b]
+     (IOUtils/toByteArray (DeflaterInputStream. (ByteArrayInputStream. b))))
+  ([b nowrap]
+     (IOUtils/toByteArray (DeflaterInputStream. (ByteArrayInputStream. b)
+			    (Deflater. Deflater/DEFAULT_COMPRESSION nowrap)))))
