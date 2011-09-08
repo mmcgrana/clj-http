@@ -23,6 +23,8 @@ The client supports simple `get`, `head`, `put`, `post`, and `delete` requests. 
                   ...}
         :body "<!doctype html>..."}
 
+In addition, the client can also specify the type of the response :body. Available options are: :stream, :byte-array. By default, :body will be of type String. See below for usage examples.
+
 More example requests:
 
     (client/get "http://site.com/resources/id")
@@ -38,6 +40,9 @@ More example requests:
     (client/get "http://site.com/search" {:query-params {"q" "foo, bar"}})
 
     (client/get "http://site.com/favicon.ico" {:as :byte-array})
+
+    ; Don't forget to close the stream.
+    (client/get "http://site.com/favicon.ico" {:as :stream})
 
     (client/post "http://site.com/api"
       {:basic-auth ["user" "pass"]

@@ -1,9 +1,11 @@
 (ns clj-http.client
   "Batteries-included HTTP client."
-  (:import (java.net URL))
+  (:import (java.net URL)
+           (java.io ByteArrayInputStream InputStream))
   (:require [clojure.string :as str])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
+  (:require [clojure.contrib.duck-streams :as duck-streams])
   (:refer-clojure :exclude (get)))
 
 (defn update [m k f & args]
@@ -69,19 +71,29 @@
   (fn [{:keys [as] :as req}]
     (let [{:keys [body] :as resp} (client req)]
       (cond
-        (or (nil? body) (= :byte-array as))
+        (or (nil? body) (= :stream as))
           resp
+        (= :byte-array as)
+          (let [resp (assoc resp :body (duck-streams/to-byte-array body))]
+            (.close body)
+            resp)
         (nil? as)
-          (assoc resp :body (String. #^"[B" body "UTF-8"))))))
-
+          (let [resp (assoc resp :body (String.
+                                        #^"[B" (duck-streams/to-byte-array body)
+                                        "UTF-8"))]
+            (.close body)
+            resp)))))
 
 (defn wrap-input-coercion [client]
   (fn [{:keys [body] :as req}]
-    (if (string? body)
-      (client (-> req (assoc :body (util/utf8-bytes body)
-                             :character-encoding "UTF-8")))
-      (client req))))
-
+    (cond
+     (string? body)
+       (client (assoc req :body (ByteArrayInputStream. (.getBytes body "UTF-8"))
+                          :character-encoding "UTF-8"))
+     (or (nil? body) (instance? InputStream body))
+       (client req)
+     :else
+       (client (assoc req :body (ByteArrayInputStream. body))))))
 
 (defn content-type-value [type]
   (if (keyword? type)
