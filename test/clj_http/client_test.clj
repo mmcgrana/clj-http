@@ -1,17 +1,17 @@
 (ns clj-http.client-test
-  (:use clojure.test)
-  (:use [clj-http.core-test :only [run-server]] )
-  (:require [clj-http.client :as client])
-  (:require [clj-http.util :as util])
+  (:use clojure.test) 
+  (:require [clj-http.client :as client]
+            [clj-http.util :as util]
+            [clojure.contrib.io  :as io])
   (:import (java.util Arrays)))
+
 
 (def base-req
   {:scheme "http"
    :server-name "localhost"
-   :server-port 18080})
+   :server-port 8080})
 
-(deftest ^{:integration true} roundtrip
-  (run-server)
+(deftest rountrip
   (let [resp (client/request (merge base-req {:uri "/get" :method :get}))]
     (is (= 200 (:status resp)))
     (is (= "close" (get-in resp [:headers "connection"])))
@@ -27,19 +27,84 @@
     (is (= req-out (client req-in)))))
 
 
+(deftest parse-url-test
+  (is (= {:scheme "http"
+          :server-name "bar.com"
+          :server-port nil
+          :uri "/bat"
+          :query-string nil}
+         (client/parse-url "http://bar.com/bat#cat")))
+  
+  (is (= {:scheme "http"
+          :server-name "foo.com"
+          :server-port nil
+          :uri "/blargh"
+          :query-string "args=true"}
+         (client/parse-url "http://foo.com/blargh?args=true")))
+  
+  (is (= {:scheme "http"
+          :server-name "mud.com"
+          :server-port 8080
+          :uri "/gnarl"
+          :query-string "boom=true"}
+         (client/parse-url "http://mud.com:8080/gnarl?boom=true"))))
+
+(deftest ensure-proper-url-test
+  (is (= "http://host.com/path"
+         (client/ensure-proper-url "/path" "http" "host.com")))
+  (is (= "https://foo.com/path"
+         (client/ensure-proper-url "foo.com/path" "https" "bar.com"))))
+
+;; http://f.com:443/orig -- /target -> http://f.com:443/doh
+;; http://g.com/old -- /new -> http://g.com/new
+;; http://h.com:8080/old -- http://hh.com/new -> http://hh.com/new
+(deftest follow-redirect-test
+  (let [client identity
+        req (client/parse-url "http://mud.com:8080/gnarl?boom=true")
+        resp {:headers {"location" "/rad?arg=foo"}}
+        red-req (client/follow-redirect client req resp)]
+    (is (= "http"
+           (:scheme red-req)))
+    (is (= "mud.com"
+           (:server-name red-req)))
+    (is (= 8080
+           (:server-port red-req)))
+    (is (= "/rad"
+           (:uri red-req)))
+    (is (= "arg=foo"
+           (:query-string red-req)))))
+
 (deftest redirect-on-get
   (let [client (fn [req]
-                 (if (= "foo.com" (:server-name req))
-                   {:status 302
-                    :headers {"location" "http://bar.com/bat"}}
-                   {:status 200
-                    :req req}))
+                 (cond
+                  (= "foo.com" (:server-name req))
+                  {:status 301
+                   :headers {"location" "http://deal.com"}}
+
+                  (= "deal.com" (:server-name req))
+                  {:status 302
+                   :headers {"location" "http://bar.com/bat?more=yes&x=3"}}
+
+                  (= "bar.com" (:server-name req))
+                  {:status 200
+                   :req req}))
         r-client (client/wrap-redirects client)
-        resp (r-client {:server-name "foo.com" :request-method :get})]
+        resp (r-client {:scheme "http"
+                        :server-name "foo.com"
+                        :request-method :get})]
+    (is (= {:status 200
+            :req {:request-method :get
+                  :scheme "http"
+                  :server-name "bar.com"
+                  :server-port nil
+                  :uri "/bat"
+                  :query-string "more=yes&x=3"}}
+           resp))
     (is (= 200 (:status resp)))
     (is (= :get (:request-method (:req resp))))
     (is (= "http" (:scheme (:req resp))))
-    (is (= "/bat" (:uri (:req resp))))))
+    (is (= "/bat" (:uri (:req resp))))
+    (is (= "more=yes&x=3" (:query-string (:req resp))))))
 
 (deftest redirect-to-get-on-head
   (let [client (fn [req]
@@ -49,7 +114,9 @@
                    {:status 200
                     :req req}))
         r-client (client/wrap-redirects client)
-        resp (r-client {:server-name "foo.com" :request-method :head})]
+        resp (r-client {:scheme "http"
+                        :server-name "foo.com"
+                        :request-method :head})]
     (is (= 200 (:status resp)))
     (is (= :get (:request-method (:req resp))))
     (is (= "http" (:scheme (:req resp))))
@@ -64,7 +131,7 @@
 
 
 (deftest throw-on-exceptional
-  (let [client (fn [req] {:status 500})
+  (let [client (fn [req] {:status 500 :body "No worky."})
         e-client (client/wrap-exceptions client)]
     (is (thrown-with-msg? Exception #"500"
       (e-client {})))))
@@ -83,18 +150,23 @@
 
 
 (deftest apply-on-compressed
-  (let [client (fn [req] {:body (util/gzip (util/utf8-bytes "foofoofoo"))
+  (let [client (fn [req] {:body (-> "foofoofoo"
+				    .getBytes
+				    util/gzip
+				    java.io.ByteArrayInputStream.)
                           :headers {"Content-Encoding" "gzip"}})
         c-client (client/wrap-decompression client)
         resp (c-client {})]
-    (is (= "foofoofoo" (util/utf8-string (:body resp))))))
+    (is (= "foofoofoo" (-> resp :body  io/slurp*)))))
 
 (deftest apply-on-deflated
-  (let [client (fn [req] {:body (util/deflate (util/utf8-bytes "barbarbar"))
+  (let [client (fn [req] {:body (-> "barbarbar" .getBytes
+				    util/deflate
+				    java.io.ByteArrayInputStream.)
                           :headers {"Content-Encoding" "deflate"}})
         c-client (client/wrap-decompression client)
         resp (c-client {})]
-    (is (= "barbarbar" (util/utf8-string (:body resp))))))
+    (is (= "barbarbar" (io/slurp* (:body resp))))))
 
 (deftest pass-on-non-compressed
   (let [c-client (client/wrap-decompression (fn [req] {:body "foo"}))
@@ -123,7 +195,7 @@
 
 
 (deftest apply-on-output-coercion
-  (let [client (fn [req] {:body (util/utf8-bytes "foo")})
+  (let [client (fn [req] {:body (io/input-stream (.getBytes "foo"))})
         o-client (client/wrap-output-coercion client)
         resp (o-client {:uri "/foo"})]
     (is (= "foo" (:body resp)))))
@@ -208,8 +280,13 @@
         resp (u-client {:uri "/foo"})]
     (is (= "/foo" (:uri resp)))))
 
-(deftest provide-default-port
-  (is (= 80   (-> "http://example.com/" client/parse-url :server-port)))
-  (is (= 8080 (-> "http://example.com:8080/" client/parse-url :server-port)))
-  (is (= 443  (-> "https://example.com/" client/parse-url :server-port)))
-  (is (= 8443 (-> "https://example.com:8443/" client/parse-url :server-port))))
+
+(deftest chunked-request-test
+  (let [client (fn [req]
+		 {:body (-> "1\r\na\r\n3\r\nfoor\r\n0\r\n\r\n"
+			    .getBytes
+			    io/input-stream)
+		  :headers {"transfer-encoding" "chunked"}})
+	o-client (client/wrap-output-coercion client)
+	resp (o-client {:chunked? true})]
+    (is (= ["a" "foo"] (:body resp)))))
