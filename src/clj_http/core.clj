@@ -5,11 +5,34 @@
   (:import (org.apache.http.entity ByteArrayEntity))
   (:import (org.apache.http.client.methods HttpGet HttpHead HttpPut HttpPost HttpDelete))
   (:import (org.apache.http.client.params CookiePolicy ClientPNames))
-  (:import (org.apache.http.impl.client DefaultHttpClient)))
+  (:import (org.apache.http.impl DefaultConnectionReuseStrategy))
+  (:import (org.apache.http.impl.client DefaultConnectionKeepAliveStrategy DefaultHttpClient))
+  (:import (org.apache.http.impl.conn SingleClientConnManager)))
 
 (defn- parse-headers [#^HttpResponse http-resp]
   (into {} (map (fn [#^Header h] [(.toLowerCase (.getName h)) (.getValue h)])
                 (iterator-seq (.headerIterator http-resp)))))
+
+(def ^:dynamic *conn-pool-ctx*
+  {:connection-header   "close"
+   :reuse-strategy      (DefaultConnectionReuseStrategy.)
+   :keep-alive-strategy (DefaultConnectionKeepAliveStrategy.)})
+
+(defn- mk-http-client
+  "Make HttpClient Instance according to the *conn-pool-ctx* spec"
+  [{mgr                 :conn-mgr
+    params              :conn-params
+    reuse-strategy      :reuse-strategy
+    keep-alive-strategy :keep-alive-strategy}]
+  (doto (DefaultHttpClient. mgr params)
+    (.setReuseStrategy reuse-strategy)
+    (.setKeepAliveStrategy keep-alive-strategy)))
+
+(defn- afterExecute
+  "Shutdown the connection manager if required"
+  [conn-mgr]
+  (if (isa? conn-mgr SingleClientConnManager)
+    (.shutdown conn-mgr)))
 
 (defn request
   "Executes the HTTP request corresponding to the given Ring request map and
@@ -19,7 +42,8 @@
    the clj-http uses ByteArrays for the bodies."
   [{:keys [request-method scheme server-name server-port uri query-string
            headers content-type character-encoding body]}]
-  (let [http-client (DefaultHttpClient.)]
+  (let [http-client (mk-http-client *conn-pool-ctx*)
+        [connection-header-v] (-> (select-keys *conn-pool-ctx* [:connection-header]) vals reverse)]
     (try
       (-> http-client
         (.getParams)
@@ -40,7 +64,7 @@
                       (str content-type "; charset=" character-encoding)))
         (if (and content-type (not character-encoding))
           (.addHeader http-req "Content-Type" content-type))
-        (.addHeader http-req "Connection" "close")
+        (.addHeader http-req "Connection" connection-header-v)
         (doseq [[header-n header-v] headers]
           (.addHeader http-req header-n header-v))
         (if body
@@ -51,5 +75,5 @@
               resp {:status (.getStatusCode (.getStatusLine http-resp))
                     :headers (parse-headers http-resp)
                     :body (if http-entity (EntityUtils/toByteArray http-entity))}]
-          (.shutdown (.getConnectionManager http-client))
+          (afterExecute (.getConnectionManager http-client))
           resp)))))
