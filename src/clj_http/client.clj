@@ -4,7 +4,8 @@
   (:require [clojure.string :as str])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
-  (:refer-clojure :exclude (get)))
+  (:refer-clojure :exclude (get))
+  (:use [clj-http.core :only [*conn-pool-ctx*]]))
 
 (defn update [m k f & args]
   (assoc m k (apply f (m k) args)))
@@ -233,3 +234,9 @@
   "Like #'request, but sets the :method and :url as appropriate."
   [url & [req]]
   (request (merge req {:method :delete :url url})))
+
+(defmacro with-connection-pool
+  "Macro to bind *conn-pool-ctx*"
+  [pool-ctx & body]
+  `(binding [*conn-pool-ctx* ~pool-ctx]
+     ~@body))
