@@ -20,11 +20,11 @@
 
 (defn- mk-http-client
   "Make HttpClient Instance according to the *conn-pool-ctx* spec"
-  [{mgr                 :conn-mgr
-    params              :conn-params
+  [{manager             :manager
+    params              :params
     reuse-strategy      :reuse-strategy
     keep-alive-strategy :keep-alive-strategy}]
-  (doto (DefaultHttpClient. mgr params)
+  (doto (DefaultHttpClient. manager params)
     (.setReuseStrategy reuse-strategy)
     (.setKeepAliveStrategy keep-alive-strategy)))
 
